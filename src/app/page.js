@@ -105,10 +105,11 @@ export default function SlideshowPage() {
             // Lebar setiap anak = 100% dibagi jumlah gambar
             style={{ width: `${100 / extendedImages.length}%` }}
           >
-            <img 
-              src={img.secure_url} 
+         <img 
+              src={img.secure_url.replace('/upload/', '/upload/q_auto,f_auto/')} 
               alt="Slideshow" 
               className="max-w-full max-h-full object-contain"
+              fetchPriority="high"
             />
           </div>
         ))}
