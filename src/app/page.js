@@ -1,69 +1,157 @@
-import Image from "next/image";
+"use client";
+import { useState, useEffect } from "react";
 
-export default function Home() {
+export default function SlideshowPage() {
+  const [images, setImages] = useState([]);
+  
+  // Ubah nilai awal currentIndex menjadi 1 karena index 0 diisi gambar terakhir (kloning)
+  const [currentIndex, setCurrentIndex] = useState(1); 
+  const [isPlaying, setIsPlaying] = useState(true);
+  
+  // State tambahan untuk mengontrol animasi "Infinite Loop"
+  const [isTransitioning, setIsTransitioning] = useState(true);
+  const [isAnimating, setIsAnimating] = useState(false); // Mencegah klik spam sebelum slide selesai
+
+  // Mengambil gambar dari API
+  useEffect(() => {
+    const fetchImages = async () => {
+      try {
+        const res = await fetch('/api/images');
+        const data = await res.json();
+        setImages(data);
+      } catch (error) {
+        console.error("Gagal memuat gambar", error);
+      }
+    };
+    fetchImages();
+  }, []);
+
+  // Logika Slideshow Otomatis
+  useEffect(() => {
+    let interval;
+    if (isPlaying && images.length > 1) {
+      interval = setInterval(() => {
+        nextSlide();
+      }, 10000); // Ganti tiap 10 detik
+    }
+    return () => clearInterval(interval);
+  }, [isPlaying, images.length]);
+
+  const nextSlide = () => {
+    if (images.length <= 1 || isAnimating) return;
+    setIsAnimating(true); // Kunci tombol saat sedang geser
+    setIsTransitioning(true); // Nyalakan efek transisi
+    setCurrentIndex((prevIndex) => prevIndex + 1);
+  };
+
+  const prevSlide = () => {
+    if (images.length <= 1 || isAnimating) return;
+    setIsAnimating(true); // Kunci tombol saat sedang geser
+    setIsTransitioning(true); // Nyalakan efek transisi
+    setCurrentIndex((prevIndex) => prevIndex - 1);
+  };
+
+  // Fungsi yang dijalankan otomatis SETELAH animasi geser selesai
+  const handleTransitionEnd = () => {
+    setIsAnimating(false); // Buka kunci, tombol bisa diklik lagi
+    if (images.length <= 1) return;
+
+    // Jika mencapai kloningan gambar pertama (berada di posisi paling kanan)
+    if (currentIndex === images.length + 1) {
+      setIsTransitioning(false); // Matikan animasi seketika
+      setCurrentIndex(1); // Lompat tanpa animasi ke gambar pertama asli
+    } 
+    // Jika mencapai kloningan gambar terakhir (berada di posisi paling kiri atau index 0)
+    else if (currentIndex === 0) {
+      setIsTransitioning(false); // Matikan animasi seketika
+      setCurrentIndex(images.length); // Lompat tanpa animasi ke gambar terakhir asli
+    }
+  };
+
+  if (images.length === 0) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-black text-white text-2xl font-sans">
+        Memuat Slideshow TV...
+      </div>
+    );
+  }
+
+  // Trik Kloning: [Gambar Terakhir] + [Semua Gambar Asli] + [Gambar Pertama]
+  const extendedImages = [
+    images[images.length - 1],
+    ...images,
+    images[0]
+  ];
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.js
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div className="relative w-full h-screen bg-black overflow-hidden group">
+      
+      {/* Wadah Panjang dengan Perhitungan Matematika Presisi */}
+      <div 
+        className="flex h-full"
+        style={{ 
+          // Lebar total wadah = jumlah gambar x 100%
+          width: `${extendedImages.length * 100}%`,
+          // Geser tepat sesuai porsi lebarnya
+          transform: `translateX(-${currentIndex * (100 / extendedImages.length)}%)`,
+          transition: isTransitioning ? "transform 1s ease-in-out" : "none" 
+        }}
+        onTransitionEnd={handleTransitionEnd}
+      >
+        {extendedImages.map((img, index) => (
+          <div 
+            key={`${img.public_id}-${index}`} 
+            className="h-full flex items-center justify-center flex-shrink-0"
+            // Lebar setiap anak = 100% dibagi jumlah gambar
+            style={{ width: `${100 / extendedImages.length}%` }}
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+            <img 
+              src={img.secure_url} 
+              alt="Slideshow" 
+              className="max-w-full max-h-full object-contain"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+          </div>
+        ))}
+      </div>
+
+      {/* Tombol Kiri (Prev) */}
+      <button 
+        onClick={prevSlide} 
+        className="absolute left-6 top-1/2 transform -translate-y-1/2 opacity-0 hover:opacity-100 transition-opacity duration-300 bg-black/40 p-3 rounded-full text-white z-10"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-10 h-10">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+        </svg>
+      </button>
+
+      {/* Tombol Kanan (Next) */}
+      <button 
+        onClick={nextSlide} 
+        className="absolute right-6 top-1/2 transform -translate-y-1/2 opacity-0 hover:opacity-100 transition-opacity duration-300 bg-black/40 p-3 rounded-full text-white z-10"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-10 h-10">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+        </svg>
+      </button>
+
+      {/* Tombol Tengah (Play/Pause) */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+        <button 
+          onClick={() => setIsPlaying(!isPlaying)}
+          className="pointer-events-auto opacity-0 hover:opacity-100 transition-opacity duration-300 bg-black/60 p-6 rounded-full text-white cursor-pointer"
+        >
+          {isPlaying ? (
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-16 h-16">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-16 h-16 ml-2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+            </svg>
+          )}
+        </button>
+      </div>
+
     </div>
   );
 }
